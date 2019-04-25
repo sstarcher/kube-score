@@ -10,14 +10,14 @@ import (
 )
 
 func Register(allChecks *checks.Checks, cnf config.Configuration) {
-	allChecks.RegisterPodCheck("Container Resources", `Makes sure that all pods have resource limits and requests set. The --ignore-container-cpu-limit flag can be used to disable the requirement of having a CPU limit`, containerResources(!cnf.IgnoreContainerCpuLimitRequirement))
+	allChecks.RegisterPodCheck("Container Resources", `Makes sure that all pods have resource limits and requests set. The --ignore-container-cpu-limit flag can be used to disable the requirement of having a CPU limit`, containerResources(!cnf.IgnoreContainerCpuLimitRequirement, !cnf.IgnoreContainerMemoryLimitRequirement))
 	allChecks.RegisterPodCheck("Container Image Tag", `Makes sure that a explicit non-latest tag is used`, containerImageTag)
 	allChecks.RegisterPodCheck("Container Image Pull Policy", `Makes sure that the pullPolicy is set to Always. This makes sure that imagePullSecrets are always validated.`, containerImagePullPolicy)
 }
 
 // containerResources makes sure that the container has resource requests and limits set
 // The check for a CPU limit requirement can be enabled via the requireCPULimit flag parameter
-func containerResources(requireCPULimit bool) func(corev1.PodTemplateSpec, string) scorecard.TestScore {
+func containerResources(requireCPULimit bool, requireMemoryLimit bool) func(corev1.PodTemplateSpec, string) scorecard.TestScore {
 	return func(podTemplate corev1.PodTemplateSpec, kind string) (score scorecard.TestScore) {
 		pod := podTemplate.Spec
 
@@ -32,7 +32,7 @@ func containerResources(requireCPULimit bool) func(corev1.PodTemplateSpec, strin
 				score.AddComment(container.Name, "CPU limit is not set", "Resource limits are recommended to avoid resource DDOS. Set resources.limits.cpu")
 				hasMissingLimit = true
 			}
-			if container.Resources.Limits.Memory().IsZero() {
+			if container.Resources.Limits.Memory().IsZero() && requireMemoryLimit {
 				score.AddComment(container.Name, "Memory limit is not set", "Resource limits are recommended to avoid resource DDOS. Set resources.limits.memory")
 				hasMissingLimit = true
 			}
